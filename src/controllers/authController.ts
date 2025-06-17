@@ -1,97 +1,176 @@
-import { Request, Response } from 'express';
+import { Request, Response, NextFunction } from 'express';
+import { body, validationResult } from 'express-validator';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { body, validationResult } from 'express-validator';
-import { database } from '../database/Database';
-import { CreateUserDto, LoginDto } from '../types/User';
+import { AppDataSource } from '../database/data-source';
+import { User } from '../entities/User';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+const userRepository = AppDataSource.getRepository(User);
 
+// Validações separadas
 export const registerValidation = [
-  body('name').trim().isLength({ min: 2 }).withMessage('Nome deve ter pelo menos 2 caracteres'),
-  body('email').isEmail().withMessage('Email inválido'),
-  body('password').isLength({ min: 6 }).withMessage('Senha deve ter pelo menos 6 caracteres')
+  body('email').isEmail().withMessage('Email deve ser válido'),
+  body('password').isLength({ min: 6 }).withMessage('Senha deve ter pelo menos 6 caracteres'),
 ];
 
 export const loginValidation = [
-  body('email').isEmail().withMessage('Email inválido'),
-  body('password').notEmpty().withMessage('Senha é obrigatória')
+  body('email').isEmail().withMessage('Email deve ser válido'),
+  body('password').notEmpty().withMessage('Senha é obrigatória'),
 ];
 
-export const register = async (req: Request, res: Response): Promise<void> => {
+/**
+ * @openapi
+ * /auth/register:
+ *   post:
+ *     summary: Registra um novo usuário
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *               password:
+ *                 type: string
+ *                 minLength: 6
+ *     responses:
+ *       201:
+ *         description: Usuário criado com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: number
+ *                 email:
+ *                   type: string
+ *       400:
+ *         description: Dados inválidos
+ *       409:
+ *         description: Email já está em uso
+ */
+export const register = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    // Verificar erros de validação
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      res.status(400).json({ errors: errors.array() });
-      return;
+      return res.status(400).json({ 
+        message: 'Dados inválidos', 
+        errors: errors.array() 
+      });
     }
 
-    const { name, email, password }: CreateUserDto = req.body;
+    const { email, password } = req.body;
 
-    const existingUser = database.findUserByEmail(email);
+    // Verificar se usuário já existe
+    const existingUser = await userRepository.findOne({ where: { email } });
     if (existingUser) {
-      res.status(400).json({ error: 'Email já está em uso' });
-      return;
+      return res.status(409).json({ message: 'Email já está em uso' });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 12);
+    // Hashear senha
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-    const user = database.createUser({
-      name,
+    // Criar novo usuário
+    const user = userRepository.create({
       email,
       password: hashedPassword
     });
 
-    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '24h' });
+    // Salvar no banco
+    const savedUser = await userRepository.save(user);
 
+    // Retornar dados do usuário (sem a senha)
     res.status(201).json({
-      message: 'Usuário criado com sucesso',
-      token,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email
-      }
+      id: savedUser.id,
+      email: savedUser.email
     });
+
   } catch (error) {
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    next(error);
   }
 };
 
-export const login = async (req: Request, res: Response): Promise<void> => {
+/**
+ * @openapi
+ * /auth/login:
+ *   post:
+ *     summary: Autentica um usuário
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *               password:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Login realizado com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 token:
+ *                   type: string
+ *       400:
+ *         description: Dados inválidos
+ *       401:
+ *         description: Credenciais inválidas
+ */
+export const login = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    // Verificar erros de validação
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      res.status(400).json({ errors: errors.array() });
-      return;
+      return res.status(400).json({ 
+        message: 'Dados inválidos', 
+        errors: errors.array() 
+      });
     }
 
-    const { email, password }: LoginDto = req.body;
+    const { email, password } = req.body;
 
-    const user = database.findUserByEmail(email);
+    // Buscar usuário por email
+    const user = await userRepository.findOne({ where: { email } });
     if (!user) {
-      res.status(401).json({ error: 'Credenciais inválidas' });
-      return;
+      return res.status(401).json({ message: 'Credenciais inválidas' });
     }
 
-    const isValidPassword = await bcrypt.compare(password, user.password);
-    if (!isValidPassword) {
-      res.status(401).json({ error: 'Credenciais inválidas' });
-      return;
+    // Verificar senha
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      return res.status(401).json({ message: 'Credenciais inválidas' });
     }
 
-    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '24h' });
+    // Gerar JWT
+    const token = jwt.sign(
+      { userId: user.id },
+      process.env.JWT_SECRET!,
+      { expiresIn: '1h' }
+    );
 
-    res.json({
-      message: 'Login realizado com sucesso',
-      token,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email
-      }
-    });
+    res.json({ token });
+
   } catch (error) {
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    next(error);
   }
 };

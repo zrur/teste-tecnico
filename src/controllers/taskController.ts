@@ -1,117 +1,369 @@
-import { Response } from 'express';
-import { body, validationResult } from 'express-validator';
-import { database } from '../database/Database';
-import { AuthRequest } from '../middleware/auth';
-import { CreateTaskDto, UpdateTaskDto } from '../types/Task';
+import { Request, Response, NextFunction } from 'express';
+import { body, param, validationResult } from 'express-validator';
+import { AppDataSource } from '../database/data-source';
+import { Task } from '../entities/Task';
+import { User } from '../entities/User';
 
+const taskRepository = AppDataSource.getRepository(Task);
+const userRepository = AppDataSource.getRepository(User);
+
+// Validações separadas
 export const createTaskValidation = [
-  body('title').trim().isLength({ min: 1 }).withMessage('Título é obrigatório'),
-  body('description').optional().trim(),
-  body('dueDate').optional().isISO8601().withMessage('Data deve estar no formato ISO8601')
+  body('title').trim().notEmpty().withMessage('Título é obrigatório'),
+  body('dueDate').optional().isISO8601().withMessage('Data de vencimento deve ser uma data válida'),
 ];
 
 export const updateTaskValidation = [
-  body('title').optional().trim().isLength({ min: 1 }).withMessage('Título não pode estar vazio'),
-  body('description').optional().trim(),
-  body('status').optional().isIn(['pending', 'completed']).withMessage('Status deve ser pending ou completed'),
-  body('dueDate').optional().isISO8601().withMessage('Data deve estar no formato ISO8601')
+  param('id').isNumeric().withMessage('ID deve ser um número'),
+  body('title').optional().trim().notEmpty().withMessage('Título não pode estar vazio'),
+  body('completed').optional().isBoolean().withMessage('Campo completed deve ser booleano'),
+  body('dueDate').optional().isISO8601().withMessage('Data de vencimento deve ser uma data válida'),
 ];
 
-export const getTasks = (req: AuthRequest, res: Response): void => {
+/**
+ * @openapi
+ * /tasks:
+ *   get:
+ *     summary: Lista todas as tarefas do usuário autenticado
+ *     tags: [Tasks]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Lista de tarefas
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   id:
+ *                     type: number
+ *                   title:
+ *                     type: string
+ *                   completed:
+ *                     type: boolean
+ *                   dueDate:
+ *                     type: string
+ *                     format: date-time
+ *                     nullable: true
+ *       401:
+ *         description: Token inválido ou expirado
+ */
+export const getTasks = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = req.userId!;
-    const { status } = req.query;
+    const userId = (req as any).userId;
 
-    const tasks = database.findTasksByUserId(userId, status as string);
+    const tasks = await taskRepository.find({
+      where: { owner: { id: userId } },
+      order: { id: 'DESC' }
+    });
+
     res.json(tasks);
   } catch (error) {
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    next(error);
   }
 };
 
-export const getTaskById = (req: AuthRequest, res: Response): void => {
+/**
+ * @openapi
+ * /tasks/{id}:
+ *   get:
+ *     summary: Busca uma tarefa específica por ID
+ *     tags: [Tasks]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: number
+ *         description: ID da tarefa
+ *     responses:
+ *       200:
+ *         description: Tarefa encontrada
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: number
+ *                 title:
+ *                   type: string
+ *                 completed:
+ *                   type: boolean
+ *                 dueDate:
+ *                   type: string
+ *                   format: date-time
+ *                   nullable: true
+ *       404:
+ *         description: Tarefa não encontrada
+ *       401:
+ *         description: Token inválido ou expirado
+ */
+export const getTaskById = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = req.userId!;
+    const userId = (req as any).userId;
     const taskId = parseInt(req.params.id);
 
-    const task = database.findTaskById(taskId, userId);
+    if (isNaN(taskId)) {
+      return res.status(400).json({ message: 'ID deve ser um número válido' });
+    }
+
+    const task = await taskRepository.findOne({
+      where: { 
+        id: taskId, 
+        owner: { id: userId } 
+      }
+    });
+
     if (!task) {
-      res.status(404).json({ error: 'Tarefa não encontrada' });
-      return;
+      return res.status(404).json({ message: 'Tarefa não encontrada' });
     }
 
     res.json(task);
   } catch (error) {
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    next(error);
   }
 };
 
-export const createTask = (req: AuthRequest, res: Response): void => {
+/**
+ * @openapi
+ * /tasks:
+ *   post:
+ *     summary: Cria uma nova tarefa
+ *     tags: [Tasks]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - title
+ *             properties:
+ *               title:
+ *                 type: string
+ *                 minLength: 1
+ *               dueDate:
+ *                 type: string
+ *                 format: date-time
+ *                 nullable: true
+ *     responses:
+ *       201:
+ *         description: Tarefa criada com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: number
+ *                 title:
+ *                   type: string
+ *                 completed:
+ *                   type: boolean
+ *                 dueDate:
+ *                   type: string
+ *                   format: date-time
+ *                   nullable: true
+ *       400:
+ *         description: Dados inválidos
+ *       401:
+ *         description: Token inválido ou expirado
+ */
+export const createTask = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      res.status(400).json({ errors: errors.array() });
-      return;
+      return res.status(400).json({ 
+        message: 'Dados inválidos', 
+        errors: errors.array() 
+      });
     }
 
-    const userId = req.userId!;
-    const { title, description, dueDate }: CreateTaskDto = req.body;
+    const userId = (req as any).userId;
+    const { title, dueDate } = req.body;
 
-    const task = database.createTask({
+    // Buscar o usuário
+    const user = await userRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      return res.status(401).json({ message: 'Usuário não encontrado' });
+    }
+
+    // Criar nova tarefa
+    const task = taskRepository.create({
       title,
-      description,
-      status: 'pending',
+      completed: 0, // Oracle: 0 = false, 1 = true
       dueDate: dueDate ? new Date(dueDate) : undefined,
-      userId
+      owner: user
     });
 
-    res.status(201).json(task);
+    const savedTask = await taskRepository.save(task);
+
+    // Converter para resposta com boolean
+    const response = {
+      ...savedTask,
+      completed: savedTask.completed === 1
+    };
+
+    res.status(201).json(response);
   } catch (error) {
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    next(error);
   }
 };
 
-export const updateTask = (req: AuthRequest, res: Response): void => {
+/**
+ * @openapi
+ * /tasks/{id}:
+ *   put:
+ *     summary: Atualiza uma tarefa existente
+ *     tags: [Tasks]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: number
+ *         description: ID da tarefa
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               title:
+ *                 type: string
+ *                 minLength: 1
+ *               completed:
+ *                 type: boolean
+ *               dueDate:
+ *                 type: string
+ *                 format: date-time
+ *                 nullable: true
+ *     responses:
+ *       200:
+ *         description: Tarefa atualizada com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: number
+ *                 title:
+ *                   type: string
+ *                 completed:
+ *                   type: boolean
+ *                 dueDate:
+ *                   type: string
+ *                   format: date-time
+ *                   nullable: true
+ *       400:
+ *         description: Dados inválidos
+ *       404:
+ *         description: Tarefa não encontrada
+ *       401:
+ *         description: Token inválido ou expirado
+ */
+export const updateTask = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      res.status(400).json({ errors: errors.array() });
-      return;
+      return res.status(400).json({ 
+        message: 'Dados inválidos', 
+        errors: errors.array() 
+      });
     }
 
-    const userId = req.userId!;
+    const userId = (req as any).userId;
     const taskId = parseInt(req.params.id);
-    const updates: UpdateTaskDto = req.body;
+    const { title, completed, dueDate } = req.body;
 
-    const updatedTask = database.updateTask(taskId, userId, {
-      ...updates,
-      dueDate: updates.dueDate ? new Date(updates.dueDate) : undefined
+    // Buscar a tarefa
+    const task = await taskRepository.findOne({
+      where: { 
+        id: taskId, 
+        owner: { id: userId } 
+      }
     });
 
-    if (!updatedTask) {
-      res.status(404).json({ error: 'Tarefa não encontrada' });
-      return;
+    if (!task) {
+      return res.status(404).json({ message: 'Tarefa não encontrada' });
     }
+
+    // Atualizar campos permitidos
+    if (title !== undefined) task.title = title;
+    if (completed !== undefined) task.completed = completed;
+    if (dueDate !== undefined) {
+      task.dueDate = dueDate ? new Date(dueDate) : undefined;
+    }
+
+    const updatedTask = await taskRepository.save(task);
 
     res.json(updatedTask);
   } catch (error) {
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    next(error);
   }
 };
 
-export const deleteTask = (req: AuthRequest, res: Response): void => {
+/**
+ * @openapi
+ * /tasks/{id}:
+ *   delete:
+ *     summary: Remove uma tarefa
+ *     tags: [Tasks]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: number
+ *         description: ID da tarefa
+ *     responses:
+ *       204:
+ *         description: Tarefa removida com sucesso
+ *       404:
+ *         description: Tarefa não encontrada
+ *       401:
+ *         description: Token inválido ou expirado
+ */
+export const deleteTask = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = req.userId!;
+    const userId = (req as any).userId;
     const taskId = parseInt(req.params.id);
 
-    const deleted = database.deleteTask(taskId, userId);
-    if (!deleted) {
-      res.status(404).json({ error: 'Tarefa não encontrada' });
-      return;
+    if (isNaN(taskId)) {
+      return res.status(400).json({ message: 'ID deve ser um número válido' });
     }
+
+    // Verificar se a tarefa existe e pertence ao usuário
+    const task = await taskRepository.findOne({
+      where: { 
+        id: taskId, 
+        owner: { id: userId } 
+      }
+    });
+
+    if (!task) {
+      return res.status(404).json({ message: 'Tarefa não encontrada' });
+    }
+
+    // Remover a tarefa
+    await taskRepository.delete(taskId);
 
     res.status(204).send();
   } catch (error) {
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    next(error);
   }
 };

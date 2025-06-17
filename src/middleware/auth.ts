@@ -1,27 +1,48 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
-
-export interface AuthRequest extends Request {
-  userId?: number;
+interface JwtPayload {
+  userId: number;
+  iat: number;
+  exp: number;
 }
 
-export const authenticateToken = (req: AuthRequest, res: Response, next: NextFunction): void => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-
-  if (!token) {
-    res.status(401).json({ error: 'Token de acesso requerido' });
-    return;
-  }
-
-  jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
-    if (err) {
-      res.status(403).json({ error: 'Token inválido' });
-      return;
+/**
+ * Middleware de autenticação JWT
+ * Verifica o token Bearer no header Authorization
+ * Injeta req.userId se válido, ou retorna 401 se inválido
+ */
+export const authenticateToken = (req: Request, res: Response, next: NextFunction) => {
+  try {
+    // Extrair token do header Authorization
+    const authHeader = req.headers.authorization;
+    
+    if (!authHeader) {
+      return res.status(401).json({ message: 'Token de acesso requerido' });
     }
-    req.userId = user.userId;
+
+    const token = authHeader.split(' ')[1]; // Bearer <token>
+    
+    if (!token) {
+      return res.status(401).json({ message: 'Token de acesso requerido' });
+    }
+
+    // Verificar e decodificar o token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as JwtPayload;
+    
+    // Injetar userId no request
+    (req as any).userId = decoded.userId;
+    
     next();
-  });
+  } catch (error) {
+    if (error instanceof jwt.JsonWebTokenError) {
+      return res.status(401).json({ message: 'Token inválido' });
+    }
+    
+    if (error instanceof jwt.TokenExpiredError) {
+      return res.status(401).json({ message: 'Token expirado' });
+    }
+    
+    return res.status(401).json({ message: 'Falha na autenticação' });
+  }
 };
