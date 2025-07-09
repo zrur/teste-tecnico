@@ -1,4 +1,4 @@
-# Dockerfile para Oracle Database
+# Dockerfile - Versão corrigida para Railway
 FROM node:18-alpine
 
 # Instalar dependências necessárias para Oracle
@@ -15,8 +15,9 @@ WORKDIR /app
 # Copiar package files
 COPY package*.json ./
 
-# Instalar dependências
-RUN npm ci --only=production
+# ✅ MUDANÇA: Usar npm install em vez de npm ci
+# npm install é mais tolerante e funciona sem package-lock.json
+RUN npm install --only=production
 
 # Copiar código fonte
 COPY . .
@@ -32,7 +33,7 @@ RUN addgroup -g 1001 -S nodejs && \
 RUN chown -R nodejs:nodejs /app
 USER nodejs
 
-# Expor porta
+# Expor porta (Railway define automaticamente)
 EXPOSE $PORT
 
 # Health check
