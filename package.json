@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "description": "API REST de To-Do com Node.js, TypeScript e TypeORM",
   "main": "dist/main.js",
+  "engines": {
+    "node": "18.x",
+    "npm": ">=8.0.0"
+  },
   "scripts": {
     "build": "tsc",
     "start": "node dist/main.js",

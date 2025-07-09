@@ -11,14 +11,14 @@ import { swaggerSpec, swaggerUiOptions } from './config/swagger';
 // Controllers
 import { register, login, registerValidation, loginValidation } from './controllers/authController';
 import {
-   getTasks,
-   getTaskById,
-   createTask,
-   updateTask,
-   deleteTask,
+  getTasks,
+  getTaskById,
+  createTask,
+  updateTask,
+  deleteTask,
   createTaskValidation,
   updateTaskValidation
- } from './controllers/taskController';
+} from './controllers/taskController';
 import { authenticateToken } from './middleware/auth';
 
 const app = express();
@@ -49,9 +49,56 @@ app.use(express.json());
  *                 message:
  *                   type: string
  *                   example: API funcionando!
+ *                 timestamp:
+ *                   type: string
+ *                   example: 2024-01-01T12:00:00.000Z
+ *                 environment:
+ *                   type: string
+ *                   example: production
  */
 app.get('/health', (req: Request, res: Response) => {
-  res.json({ status: 'OK', message: 'API funcionando!' });
+  res.json({ 
+    status: 'OK', 
+    message: 'API funcionando!',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development',
+    version: '1.0.0'
+  });
+});
+
+/**
+ * @openapi
+ * /:
+ *   get:
+ *     summary: Informações da API
+ *     tags: [Info]
+ *     responses:
+ *       200:
+ *         description: Informações básicas da API
+ */
+app.get('/', (req: Request, res: Response) => {
+  res.json({
+    name: 'Todo API',
+    version: '1.0.0',
+    description: 'API REST para gerenciamento de tarefas',
+    environment: process.env.NODE_ENV || 'development',
+    endpoints: {
+      docs: '/api-docs',
+      health: '/health',
+      auth: {
+        register: 'POST /auth/register',
+        login: 'POST /auth/login'
+      },
+      tasks: {
+        list: 'GET /tasks',
+        create: 'POST /tasks',
+        get: 'GET /tasks/:id',
+        update: 'PUT /tasks/:id',
+        delete: 'DELETE /tasks/:id'
+      }
+    },
+    timestamp: new Date().toISOString()
+  });
 });
 
 // Documentação Swagger
@@ -77,27 +124,56 @@ app.delete('/tasks/:id', authenticateToken, deleteTask);
 // Middleware de erro global
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   console.error('Erro:', err);
-  res.status(500).json({ error: 'Erro interno do servidor' });
+  
+  // Log detalhado em desenvolvimento
+  if (process.env.NODE_ENV === 'development') {
+    console.error('Stack trace:', err.stack);
+  }
+  
+  res.status(err.status || 500).json({ 
+    success: false,
+    error: process.env.NODE_ENV === 'production' 
+      ? 'Erro interno do servidor' 
+      : err.message,
+    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+  });
 });
 
 // Rota 404
 app.use('*', (req: Request, res: Response) => {
-  res.status(404).json({ error: 'Rota não encontrada' });
+  res.status(404).json({ 
+    success: false,
+    error: 'Rota não encontrada',
+    path: req.originalUrl,
+    method: req.method,
+    timestamp: new Date().toISOString()
+  });
 });
 
 // Inicializar o banco de dados e servidor
 const startServer = async () => {
   try {
+    console.log('🔄 Inicializando servidor...');
+    console.log(`📊 Ambiente: ${process.env.NODE_ENV || 'development'}`);
+    
     // Inicializar conexão com o banco
     await AppDataSource.initialize();
     console.log('✅ Conexão com o banco de dados estabelecida');
-
-    // Iniciar servidor
-    app.listen(PORT, () => {
+    
+    // Sincronizar schema em desenvolvimento
+    if (process.env.NODE_ENV === 'development') {
+      await AppDataSource.synchronize();
+      console.log('🔄 Schema do banco sincronizado');
+    }
+    
+    // Iniciar servidor - Railway usa 0.0.0.0 para binding
+    const host = process.env.NODE_ENV === 'production' ? '0.0.0.0' : 'localhost';
+    
+    app.listen(PORT, host, () => {
       console.log(`🚀 Servidor rodando na porta ${PORT}`);
-      console.log(`📍 URL: http://localhost:${PORT}`);
-      console.log(`🏥 Health check: http://localhost:${PORT}/health`);
-      console.log(`📚 Documentação Swagger: http://localhost:${PORT}/api-docs`);
+      console.log(`📍 URL: http://${host}:${PORT}`);
+      console.log(`🏥 Health check: http://${host}:${PORT}/health`);
+      console.log(`📚 Documentação Swagger: http://${host}:${PORT}/api-docs`);
       console.log('');
       console.log('📚 Endpoints disponíveis:');
       console.log('  POST /auth/register - Cadastro');
@@ -108,12 +184,48 @@ const startServer = async () => {
       console.log('  PUT /tasks/:id - Atualizar tarefa');
       console.log('  DELETE /tasks/:id - Excluir tarefa');
     });
-
+    
   } catch (error) {
     console.error('❌ Erro ao inicializar o servidor:', error);
+    
+    // Log mais detalhado do erro
+    if (error instanceof Error) {
+      console.error('Detalhes do erro:', error.message);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Stack trace:', error.stack);
+      }
+    }
+    
     process.exit(1);
   }
 };
+
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  console.log('🔄 Recebido SIGTERM, finalizando servidor...');
+  
+  try {
+    await AppDataSource.destroy();
+    console.log('✅ Conexão com banco fechada');
+    process.exit(0);
+  } catch (error) {
+    console.error('❌ Erro ao fechar conexão:', error);
+    process.exit(1);
+  }
+});
+
+process.on('SIGINT', async () => {
+  console.log('🔄 Recebido SIGINT, finalizando servidor...');
+  
+  try {
+    await AppDataSource.destroy();
+    console.log('✅ Conexão com banco fechada');
+    process.exit(0);
+  } catch (error) {
+    console.error('❌ Erro ao fechar conexão:', error);
+    process.exit(1);
+  }
+});
 
 // Iniciar aplicação
 startServer();
