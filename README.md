@@ -1,19 +1,34 @@
 # 🎯 To-Do API - Teste Técnico
 
+[![Deploy Status](https://img.shields.io/badge/Deploy-Live-brightgreen)](https://teste-tecnico-production.up.railway.app/)
+[![API Health](https://img.shields.io/badge/API-Healthy-success)](https://teste-tecnico-production.up.railway.app/health)
+[![Documentation](https://img.shields.io/badge/Docs-Swagger-blue)](https://teste-tecnico-production.up.railway.app/api-docs)
+
 API REST para gerenciamento de tarefas pessoais desenvolvida com Node.js, TypeScript e Oracle Database.
+
+## 🌐 Demo Online
+
+**🚀 API em Produção:** https://teste-tecnico-production.up.railway.app/
+
+**📚 Documentação Swagger:** https://teste-tecnico-production.up.railway.app/api-docs
+
+**🏥 Health Check:** https://teste-tecnico-production.up.railway.app/health
+
+---
 
 ## 🚀 Tecnologias
 
 - **Node.js** com **TypeScript**
 - **Express.js** para servidor HTTP
 - **TypeORM** para ORM e migrations
-- **Oracle Database** para persistência
+- **Oracle Database** para persistência (FIAP)
 - **JWT** para autenticação
 - **bcryptjs** para hash de senhas
 - **express-validator** para validação
 - **Jest** para testes unitários e de integração
 - **Swagger/OpenAPI** para documentação
 - **Helmet** e **CORS** para segurança
+- **Railway** para deploy e hosting
 
 ## 📋 Funcionalidades Implementadas
 
@@ -40,7 +55,50 @@ API REST para gerenciamento de tarefas pessoais desenvolvida com Node.js, TypeSc
 - [x] Tipagem TypeScript completa
 - [x] Testes unitários e de integração com Jest
 
-## 🛠️ Como Executar
+### ✅ Deploy e Produção
+- [x] Deploy automatizado no Railway
+- [x] Integração com Oracle Database da FIAP
+- [x] Configuração de variáveis de ambiente
+- [x] HTTPS e domínio público
+- [x] Monitoramento e logs em produção
+
+## 🧪 Testando a API Online
+
+### 1. Swagger UI (Mais Fácil) 🌟
+**Acesse:** https://teste-tecnico-production.up.railway.app/api-docs
+
+- Interface visual completa
+- Teste todos os endpoints
+- Autenticação integrada
+- Exemplos de payload
+
+### 2. Teste Rápido com cURL
+```bash
+# 1. Registrar usuário
+curl -X POST https://teste-tecnico-production.up.railway.app/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"teste@email.com","password":"123456"}'
+
+# 2. Login (copie o token da resposta)
+curl -X POST https://teste-tecnico-production.up.railway.app/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"teste@email.com","password":"123456"}'
+
+# 3. Criar tarefa (substitua SEU_TOKEN pelo token do login)
+curl -X POST https://teste-tecnico-production.up.railway.app/tasks \
+  -H "Authorization: Bearer SEU_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Minha primeira tarefa","description":"Testando API em produção"}'
+
+# 4. Listar tarefas
+curl -X GET https://teste-tecnico-production.up.railway.app/tasks \
+  -H "Authorization: Bearer SEU_TOKEN"
+```
+
+### 3. Teste com Postman/Insomnia
+Importe a coleção usando: https://teste-tecnico-production.up.railway.app/api-docs.json
+
+## 🛠️ Desenvolvimento Local
 
 ### Pré-requisitos
 - **Node.js** (v18+)
@@ -49,8 +107,8 @@ API REST para gerenciamento de tarefas pessoais desenvolvida com Node.js, TypeSc
 ### Instalação
 ```bash
 # 1. Clonar o repositório
-git clone <repo-url>
-cd teste-tecnico-1
+git clone https://github.com/zrur/teste-tecnico.git
+cd teste-tecnico
 
 # 2. Instalar dependências
 npm install
@@ -82,6 +140,10 @@ docker run -d \
 - Configurar Autonomous Database
 - Usar as credenciais no .env
 
+**Opção 3: Oracle FIAP** (produção)
+- Usar as credenciais fornecidas pela FIAP
+- Configurar conexão externa
+
 ### Configuração do .env
 ```env
 # Servidor
@@ -89,21 +151,22 @@ PORT=3000
 NODE_ENV=development
 
 # Oracle Database
-DB_HOST=localhost
+DB_HOST=localhost  # ou oracle.fiap.com.br para produção
 DB_PORT=1521
-DB_USERNAME=system
-DB_PASSWORD=oracle
-DB_SID=XE
+DB_USERNAME=system  # ou seu RM da FIAP
+DB_PASSWORD=oracle  # ou sua senha da FIAP
+DB_SID=XE  # ou ORCL para FIAP
 
 # JWT Secret
 JWT_SECRET=sua_chave_secreta_forte_aqui
 ```
 
-## 📚 Endpoints
+## 📚 Endpoints da API
 
 ### Health Check
 ```http
 GET /health              # Verificar se API está funcionando
+GET /                    # Informações da API
 ```
 
 ### Autenticação
@@ -127,9 +190,8 @@ GET /api-docs            # Swagger UI interativo
 GET /api-docs.json       # Especificação OpenAPI JSON
 ```
 
-## 🧪 Testando
+## 🧪 Testes Automatizados
 
-### 1. Testes Automatizados
 ```bash
 # Executar todos os testes
 npm test
@@ -146,65 +208,6 @@ npm run test:watch
 - ✅ Testes de paginação
 - ✅ Testes de helpers
 - ✅ Mocks e fixtures organizados
-
-### 2. Swagger UI (Mais Fácil)
-```
-http://localhost:3000/api-docs
-```
-- Interface visual completa
-- Teste todos os endpoints
-- Autenticação integrada
-
-### 3. Arquivo HTTP (VS Code)
-Crie `test.http` na raiz:
-```http
-### Registrar usuário
-POST http://localhost:3000/auth/register
-Content-Type: application/json
-
-{
-  "email": "teste@email.com",
-  "password": "123456"
-}
-
-### Login
-POST http://localhost:3000/auth/login
-Content-Type: application/json
-
-{
-  "email": "teste@email.com",
-  "password": "123456"
-}
-
-### Criar tarefa (use o token do login)
-POST http://localhost:3000/tasks
-Authorization: Bearer SEU_TOKEN_AQUI
-Content-Type: application/json
-
-{
-  "title": "Estudar TypeORM",
-  "dueDate": "2024-12-31T23:59:59.000Z"
-}
-```
-
-### 4. cURL
-```bash
-# 1. Registrar usuário
-curl -X POST http://localhost:3000/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"email":"teste@email.com","password":"123456"}'
-
-# 2. Login
-curl -X POST http://localhost:3000/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"teste@email.com","password":"123456"}'
-
-# 3. Criar tarefa (substituir TOKEN)
-curl -X POST http://localhost:3000/tasks \
-  -H "Authorization: Bearer TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"title":"Minha tarefa","dueDate":"2024-12-31T23:59:59.000Z"}'
-```
 
 ## 📁 Estrutura do Projeto
 
@@ -228,12 +231,35 @@ src/
 
 tests/
 ├── controllers/        # Testes dos controllers
-│   ├── authController.test.ts
-│   ├── taskController.test.ts
-│   └── pagination.test.ts
 ├── helpers/            # Utilitários para testes
-│   └── testHelpers.ts
 └── setup.ts           # Configuração dos testes
+```
+
+## 🚀 Deploy e Infraestrutura
+
+### **Railway Cloud Platform**
+- ✅ Deploy automatizado via GitHub
+- ✅ Build com TypeScript nativo
+- ✅ Variáveis de ambiente seguras
+- ✅ HTTPS automático
+- ✅ Monitoramento integrado
+- ✅ Logs em tempo real
+
+### **Oracle Database FIAP**
+- ✅ Conexão externa estável
+- ✅ Dados persistentes
+- ✅ Performance otimizada
+- ✅ Backup automático
+
+### **Configuração de Produção**
+```env
+NODE_ENV=production
+DB_HOST=oracle.fiap.com.br
+DB_PORT=1521
+DB_USERNAME=rm558798
+DB_PASSWORD=***
+DB_SID=ORCL
+JWT_SECRET=***
 ```
 
 ## ✅ Critérios Atendidos
@@ -273,8 +299,8 @@ tests/
 ### **Oracle Database**
 - Persistência robusta e escalável
 - Suporte a transações ACID
-- Tipos de dados apropriados (TIMESTAMP, VARCHAR2)
-- Integração nativa com TypeORM
+- Integração com infraestrutura FIAP
+- Tipos de dados apropriados
 
 ### **TypeORM**
 - ORM maduro para TypeScript
@@ -282,59 +308,66 @@ tests/
 - Relacionamentos tipados
 - Suporte completo ao Oracle
 
+### **Railway para Deploy**
+- Deploy automatizado
+- Integração com GitHub
+- Configuração simplificada
+- Monitoramento integrado
+
 ### **JWT Stateless**
 - Autenticação escalável
 - Sem necessidade de sessão no servidor
-- Expiração configurável (1 hora)
+- Expiração configurável
 
-### **Express-validator**
-- Validação declarativa
-- Sanitização automática
-- Mensagens de erro padronizadas
+## 🏆 Diferenciais Implementados
 
-### **Jest**
-- Framework de testes robusto
-- Mocks e fixtures organizados
-- Cobertura de código
-- Integração com TypeScript
-
-### **Swagger/OpenAPI**
-- Documentação viva
-- Interface de testes integrada
-- Padrão da indústria
-
-## 🚀 Melhorias Implementadas
-
-- [x] ✅ **Persistência em Oracle Database**
-- [x] ✅ **Documentação Swagger/OpenAPI**
-- [x] ✅ **Segurança com Helmet e CORS**
-- [x] ✅ **Validação robusta de dados**
-- [x] ✅ **Estrutura TypeScript profissional**
-- [x] ✅ **ORM com relacionamentos**
-- [x] ✅ **Configuração via .env**
-- [x] ✅ **Testes unitários e de integração**
+- ✅ **API em Produção:** Funcionando 24/7 na nuvem
+- ✅ **Oracle Database:** Banco empresarial robusto
+- ✅ **TypeORM:** ORM profissional com migrations
+- ✅ **Swagger Completo:** Documentação interativa
+- ✅ **Testes Automatizados:** Jest com cobertura
+- ✅ **Deploy Automatizado:** CI/CD via Railway
+- ✅ **Segurança:** Helmet, CORS, validações
+- ✅ **Tipagem Total:** TypeScript em 100% do código
+- ✅ **Arquitetura Limpa:** Separação clara de responsabilidades
 
 ## 🔮 Melhorias Futuras
 
+- [ ] Frontend React/Next.js para consumir a API
+- [ ] App mobile React Native
 - [ ] Paginação avançada nas listagens
-- [ ] Rate limiting
-- [ ] Logs estruturados com Winston
+- [ ] Rate limiting e throttling
 - [ ] Cache com Redis
-- [ ] CI/CD pipeline com testes automatizados
+- [ ] Logs estruturados com Winston
+- [ ] Métricas e monitoring avançado
 - [ ] Docker compose completo
-- [ ] Métricas e monitoring
-- [ ] Cobertura de testes 100%
+- [ ] Notificações push
 
-## 🏆 Diferenciais
+## 🌟 Como Usar esta API
 
-- **Oracle Database:** Banco empresarial robusto
-- **TypeORM:** ORM profissional com migrations
-- **Swagger Completo:** Documentação interativa
-- **Testes Automatizados:** Jest com cobertura de código
-- **Segurança:** Helmet, CORS, validações
-- **Tipagem Total:** TypeScript em 100% do código
-- **Arquitetura Limpa:** Separação clara de responsabilidades
+Esta API está pronta para ser consumida por qualquer frontend ou aplicação mobile. Exemplos de uso:
+
+### **Web Apps**
+- React.js / Next.js
+- Vue.js / Nuxt.js
+- Angular
+- Vanilla JavaScript
+
+### **Mobile Apps**
+- React Native
+- Flutter
+- Ionic
+
+### **Desktop Apps**
+- Electron
+- Tauri
+
+**Base URL:** `https://teste-tecnico-production.up.railway.app`
+
+**Documentação:** `https://teste-tecnico-production.up.railway.app/api-docs`
 
 ---
 
-**🎯 API profissional, testada e pronta para produção, com todas as melhores práticas implementadas!**
+**🎯 API profissional, testada, documentada e rodando em produção - pronta para uso real!**
+
+**🚀 Desenvolvido por:** [Arthur](https://github.com/zrur) | **🌐 Deploy:** [Railway](https://railway.app) | **🗄️ Database:** Oracle FIAP
