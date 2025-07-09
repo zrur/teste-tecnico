@@ -11,6 +11,7 @@ API REST para gerenciamento de tarefas pessoais desenvolvida com Node.js, TypeSc
 - **JWT** para autenticação
 - **bcryptjs** para hash de senhas
 - **express-validator** para validação
+- **Jest** para testes unitários e de integração
 - **Swagger/OpenAPI** para documentação
 - **Helmet** e **CORS** para segurança
 
@@ -37,6 +38,7 @@ API REST para gerenciamento de tarefas pessoais desenvolvida com Node.js, TypeSc
 - [x] Tratamento robusto de erros
 - [x] Logs estruturados
 - [x] Tipagem TypeScript completa
+- [x] Testes unitários e de integração com Jest
 
 ## 🛠️ Como Executar
 
@@ -59,6 +61,9 @@ cp .env.example .env
 
 # 4. Executar em desenvolvimento
 npm run dev
+
+# 5. Executar testes
+npm test
 ```
 
 ### Configuração do Banco (Oracle)
@@ -124,7 +129,25 @@ GET /api-docs.json       # Especificação OpenAPI JSON
 
 ## 🧪 Testando
 
-### 1. Swagger UI (Mais Fácil)
+### 1. Testes Automatizados
+```bash
+# Executar todos os testes
+npm test
+
+# Executar testes com cobertura
+npm run test:coverage
+
+# Executar testes em modo watch
+npm run test:watch
+```
+
+**Testes implementados:**
+- ✅ Testes de controllers (auth e tasks)
+- ✅ Testes de paginação
+- ✅ Testes de helpers
+- ✅ Mocks e fixtures organizados
+
+### 2. Swagger UI (Mais Fácil)
 ```
 http://localhost:3000/api-docs
 ```
@@ -132,7 +155,7 @@ http://localhost:3000/api-docs
 - Teste todos os endpoints
 - Autenticação integrada
 
-### 2. Arquivo HTTP (VS Code)
+### 3. Arquivo HTTP (VS Code)
 Crie `test.http` na raiz:
 ```http
 ### Registrar usuário
@@ -164,7 +187,7 @@ Content-Type: application/json
 }
 ```
 
-### 3. cURL
+### 4. cURL
 ```bash
 # 1. Registrar usuário
 curl -X POST http://localhost:3000/auth/register \
@@ -202,6 +225,15 @@ src/
 ├── types/              # Tipos TypeScript
 │   └── index.ts        # DTOs e interfaces
 └── main.ts             # Servidor principal
+
+tests/
+├── controllers/        # Testes dos controllers
+│   ├── authController.test.ts
+│   ├── taskController.test.ts
+│   └── pagination.test.ts
+├── helpers/            # Utilitários para testes
+│   └── testHelpers.ts
+└── setup.ts           # Configuração dos testes
 ```
 
 ## ✅ Critérios Atendidos
@@ -227,6 +259,7 @@ src/
 - Configuração via environment variables
 - Segurança com Helmet e CORS
 - ORM com TypeORM
+- Testes unitários e de integração
 
 ### **Documentação (10%)** ✅
 - README completo com setup
@@ -259,6 +292,12 @@ src/
 - Sanitização automática
 - Mensagens de erro padronizadas
 
+### **Jest**
+- Framework de testes robusto
+- Mocks e fixtures organizados
+- Cobertura de código
+- Integração com TypeScript
+
 ### **Swagger/OpenAPI**
 - Documentação viva
 - Interface de testes integrada
@@ -273,27 +312,29 @@ src/
 - [x] ✅ **Estrutura TypeScript profissional**
 - [x] ✅ **ORM com relacionamentos**
 - [x] ✅ **Configuração via .env**
+- [x] ✅ **Testes unitários e de integração**
 
 ## 🔮 Melhorias Futuras
 
-- [ ] Testes unitários com Jest
-- [ ] Paginação nas listagens
+- [ ] Paginação avançada nas listagens
 - [ ] Rate limiting
 - [ ] Logs estruturados com Winston
 - [ ] Cache com Redis
-- [ ] CI/CD pipeline
+- [ ] CI/CD pipeline com testes automatizados
 - [ ] Docker compose completo
 - [ ] Métricas e monitoring
+- [ ] Cobertura de testes 100%
 
 ## 🏆 Diferenciais
 
 - **Oracle Database:** Banco empresarial robusto
 - **TypeORM:** ORM profissional com migrations
 - **Swagger Completo:** Documentação interativa
+- **Testes Automatizados:** Jest com cobertura de código
 - **Segurança:** Helmet, CORS, validações
 - **Tipagem Total:** TypeScript em 100% do código
 - **Arquitetura Limpa:** Separação clara de responsabilidades
 
 ---
 
-**🎯 API profissional, pronta para produção, com todas as melhores práticas implementadas!**
+**🎯 API profissional, testada e pronta para produção, com todas as melhores práticas implementadas!**
