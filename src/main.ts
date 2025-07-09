@@ -22,7 +22,8 @@ import {
 import { authenticateToken } from './middleware/auth';
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+// ✅ CORREÇÃO: Garantir que PORT seja sempre number
+const PORT = parseInt(process.env.PORT || '3000');
 
 // Middlewares básicos
 app.use(helmet());
@@ -38,23 +39,6 @@ app.use(express.json());
  *     responses:
  *       200:
  *         description: API funcionando corretamente
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: string
- *                   example: OK
- *                 message:
- *                   type: string
- *                   example: API funcionando!
- *                 timestamp:
- *                   type: string
- *                   example: 2024-01-01T12:00:00.000Z
- *                 environment:
- *                   type: string
- *                   example: production
  */
 app.get('/health', (req: Request, res: Response) => {
   res.json({ 
@@ -155,6 +139,7 @@ const startServer = async () => {
   try {
     console.log('🔄 Inicializando servidor...');
     console.log(`📊 Ambiente: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`🔌 Porta: ${PORT}`);
     
     // Inicializar conexão com o banco
     await AppDataSource.initialize();
@@ -166,9 +151,10 @@ const startServer = async () => {
       console.log('🔄 Schema do banco sincronizado');
     }
     
-    // Iniciar servidor - Railway usa 0.0.0.0 para binding
+    // ✅ CORREÇÃO: HOST binding correto para Railway
     const host = process.env.NODE_ENV === 'production' ? '0.0.0.0' : 'localhost';
     
+    // ✅ PORT agora é garantidamente number
     app.listen(PORT, host, () => {
       console.log(`🚀 Servidor rodando na porta ${PORT}`);
       console.log(`📍 URL: http://${host}:${PORT}`);
